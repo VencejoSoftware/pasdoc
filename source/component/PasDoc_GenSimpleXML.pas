@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -87,6 +87,7 @@ begin
   inherited;
   WriteUnits(1);
   WriteIntroduction;
+  WriteAdditionalFiles;
   WriteConclusion;
   EndSpellChecking;
 end;

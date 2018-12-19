@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -36,9 +36,7 @@ unit PasDoc_Parser;
 
 interface
 
-uses
-  Classes,
-  Contnrs,
+uses SysUtils, Classes, Contnrs,
   PasDoc_Types,
   PasDoc_Items,
   PasDoc_Scanner,
@@ -47,6 +45,10 @@ uses
   PasDoc_StringVector;
 
 type
+  { Raised when an impossible situation (indicating bug in
+    pasdoc) occurs. }
+  EInternalParserError = class(Exception);
+
   TCioParseMode = (pmUndefined, pmConst, pmVar, pmType);
   { @name stores a CIO reference and current state. }
   TPasCioHelper = class(TObject)
@@ -191,8 +193,8 @@ type
     ItemsForNextBackComment: TPasItems;
 
     { Returns @link(TMethodType) value for corresponding @link(TKeyWord) value.
-      If given KeyWord has no corresponding @link(TMethodType) value,
-      raises @link(EInternalError). }
+      @raises(EInternalParserError
+        If given KeyWord has no corresponding @link(TMethodType) value.) }
     function KeyWordToMethodType(KeyWord: TKeyWord): TMethodType;
 
     procedure DoError(const AMessage: string;
@@ -214,6 +216,10 @@ type
 
     { Replaces HelpInsight XML tags like <summary> with PasDoc tags }
     procedure ExpandHelpInsightDescriptions(var DescriptionInfo: TRawDescriptionInfo);
+
+    { Remove Lazarus %region declarations from a description,
+      see http://wiki.freepascal.org/IDE_Window:_Editor_Options_Code_Folding#About_.7B.25Region.7D }
+    procedure RemoveRegionDeclarations(var DescriptionInfo: TRawDescriptionInfo);
 
     { If not IsLastComment, then returns @link(EmptyRawDescriptionInfo)
       otherwise returns LastCommentInfo and sets IsLastComment to false. }
@@ -471,7 +477,7 @@ implementation
 uses
   {$ifdef FPC_RegExpr} RegExpr, {$endif}
   {$ifdef DELPHI_RegularExpressions} RegularExpressions, {$endif}
-  SysUtils, PasDoc_Utils;
+  PasDoc_Utils;
 
 { ---------------------------------------------------------------------------- }
 { TParser }
@@ -522,7 +528,7 @@ begin
     KEY_FUNCTION:    Result := METHOD_FUNCTION;
     KEY_PROCEDURE:   Result := METHOD_PROCEDURE;
   else
-    raise EInternalError.Create('KeyWordToMethodType: invalid keyword');
+    raise EInternalParserError.Create('KeyWordToMethodType: invalid keyword');
   end;
 end;
 
@@ -577,6 +583,7 @@ begin
   s := ReplaceRegEx(s, '</para>', LineEnding + LineEnding);
   s := ReplaceRegEx(s, '<returns[ ]*([^>]*)>', '@returns($1');
   s := ReplaceRegEx(s, '</returns>', ')');
+  s := ReplaceRegEx(s, '<exception[ \t]+cref[ \t]*=[ \t]*"([^"]*)"[ \t]*>', '@raises($1 ');
   s := ReplaceRegEx(s, '<exception[ ]*([^>]*)>', '@raises($1');
   s := ReplaceRegEx(s, '</exception>', ')');
   s := ReplaceRegEx(s, '<permission[ ]*([^>]*)>', '@permission($1');  //not yet implemented
@@ -606,7 +613,24 @@ begin
   s := ReplaceRegEx(s, '</comment>', '');
   s := ReplaceRegEx(s, '<exclude[^/]*/>', '@exclude');
   s := ReplaceRegEx(s, '<see[ \t]+cref[ \t]*=[ \t]*"([^"]*)"[ \t]*/>', '@link($1)');
+  s := ReplaceRegEx(s, '<see[ \t]+cref[ \t]*=[ \t]*"([^"]*)"[ \t]*>', '@link($1 ');
+  s := ReplaceRegEx(s, '</see>', ')');
+  s := ReplaceRegEx(s, '<seealso[ \t]+cref[ \t]*=[ \t]*"([^"]*)"[ \t]*/>', '@seealso($1)');
+  s := ReplaceRegEx(s, '<seealso[ \t]+cref[ \t]*=[ \t]*"([^"]*)"[ \t]*>', '@seealso($1 ');
+  s := ReplaceRegEx(s, '</seealso>', ')');
   DescriptionInfo.Content := s;
+end;
+
+procedure TParser.RemoveRegionDeclarations(var DescriptionInfo: TRawDescriptionInfo);
+begin
+  if IsPrefix('%region /fold', DescriptionInfo.Content) then
+    DescriptionInfo.Content := RemovePrefix('%region /fold', DescriptionInfo.Content)
+  else
+  if IsPrefix('%region', DescriptionInfo.Content) then
+    DescriptionInfo.Content := RemovePrefix('%region', DescriptionInfo.Content)
+  else
+  if IsPrefix('%endregion', DescriptionInfo.Content) then
+    DescriptionInfo.Content := RemovePrefix('%endregion', DescriptionInfo.Content);
 end;
 
 { ---------------------------------------------------------------------------- }
@@ -644,6 +668,7 @@ begin
   begin
     if LastCommentHelpInsight then
       ExpandHelpInsightDescriptions(LastCommentInfo);
+    RemoveRegionDeclarations(LastCommentInfo);
     Result := LastCommentInfo;
     IsLastComment := false;
   end else
@@ -3028,7 +3053,7 @@ begin
           ivImplicit:
             Visibility := viImplicit;
           else
-            raise EInternalError.Create('ImplicitVisibility = ??');
+            raise EInternalParserError.Create('ImplicitVisibility = ??');
         end;
       end
       else
@@ -3059,7 +3084,7 @@ procedure TParser.ParseCioEx(const U: TPasUnit;
 
   { TODO: this is mostly a copy&paste of ParseType! Should be merged,
     otherwise modifying one of them always needs to be carefully duplicated. }
-  procedure ParseInternalType;
+  procedure ParseNestedType;
   var
     RawDescriptionInfo: TRawDescriptionInfo;
     NormalType: TPasType;
@@ -3294,7 +3319,7 @@ begin
       Exit;
 
     while ParseCioMembers(LCio, LMode, IsInRecordCase, LVisibility) do
-    begin // A Cio completed, internal or outer CIO
+    begin // A Cio completed, nested or outer CIO
       ItemsForNextBackComment.ClearAndAdd(LCio);
       if (FCioSk.Count > 0) then
       begin
@@ -3331,7 +3356,7 @@ begin
     LHlp := nil;
     LCio := nil;
 
-    ParseInternalType;
+    ParseNestedType;
 
   except
     LCio.Free;

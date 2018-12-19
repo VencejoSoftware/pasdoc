@@ -5,8 +5,8 @@
     {trUnits} strKeep, //'Units',
     {trClassHierarchy} 'Klassenhierarchie',
     {trCio} 'Klassen, Interfaces und Objekte',
-    {trInternalCR} 'Interne Klassen and Records',
-    {trInternalTypes} 'Interne Typen',
+    {trNestedCR} strToDo, //'Nested Classes and Records',
+    {trNestedTypes} strToDo, //'Nested Types',
     {trIdentifiers} 'Bezeichner',
     {trGvUses} 'Graph der Unit-Abhängigkeiten',
     {trGvClasses} 'Graph der Klassenhierarchie',
@@ -63,6 +63,7 @@
     {trOverview} 'Übersicht',
     {trIntroduction} 'Einführung',
     {trConclusion} 'Fazit',
+    {trAdditionalFile} 'weitere Datei',
     {trEnclosingClass} 'Einschließende Klasse',
     {trHeadlineCio} 'Alle Klassen, Schnittstellen, Objekte und Records',
     {trHeadlineConstants} 'Alle Konstanten',
@@ -98,7 +99,7 @@
     {trOnDateTime} 'am',
     {trSearch} 'Suchen',
     {trSeeAlso} 'Siehe auch',
-    {trInternal} 'intern',
+    {trNested} strToDo, //'nested',
     {trAttributes} strToDo, //'Attributes',
     ''  //dummy
   );

@@ -5,8 +5,8 @@
     {trUnits} 'Unitats',
     {trClassHierarchy} strToDo, //'Class Hierarchy',
     {trCio} 'Clases, interfaces i objectes',
-    {trInternalCR} strToDo, // 'Internal Classes and Records',
-    {trInternalTypes} strToDo, // 'Internal Types',
+    {trNestedCR} strToDo, // 'Nested Classes and Records',
+    {trNestedTypes} strToDo, // 'Nested Types',
     {trIdentifiers} 'Identificadors',
     {trGvUses} strToDo, //'Unit dependency graph',
     {trGvClasses} strToDo, //'Classes hierarchy graph',
@@ -63,6 +63,7 @@
     {trOverview} 'Resum',
     {trIntroduction} strToDo, //'Introduction',
     {trConclusion} strToDo, //'Conclusion',
+    {trAdditionalFile} strToDo, //'additional file',
     {trEnclosingClass} strToDo, //'Enclosing Class',
     {trHeadlineCio} 'Totes les clases, interfaces i objectes',
     {trHeadlineConstants} 'Totes les constants',
@@ -98,7 +99,7 @@
     {trOnDateTime} strToDo, //'on',
     {trSearch} strToDo, //'Search',
     {trSeeAlso} strToDo, //'See also',
-    {trInternal} strToDo, //'internal',
+    {trNested} strToDo, //'nested',
     {trAttributes} strToDo, //'Attributes',
     ''  //dummy
   );

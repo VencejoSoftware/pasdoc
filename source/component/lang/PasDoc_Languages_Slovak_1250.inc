@@ -5,8 +5,8 @@ RTransTable = (
     {trUnits} 'Jednotky',
     {trClassHierarchy} strToDo, //'Class Hierarchy',
     {trCio} 'Triedy, interfejsy a objekty',
-    {trInternalCR} strToDo, // 'Internal Classes and Records',
-    {trInternalTypes} strToDo, // 'Internal Types',
+    {trNestedCR} strToDo, // 'Nested Classes and Records',
+    {trNestedTypes} strToDo, // 'Nested Types',
     {trIdentifiers} 'Identifikátory',
     {trGvUses} strToDo, //'Unit dependency graph',
     {trGvClasses} strToDo, //'Classes hierarchy graph',
@@ -63,6 +63,7 @@ RTransTable = (
     {trOverview} strToDo, //'Overview',
     {trIntroduction} strToDo, //'Introduction',
     {trConclusion} strToDo, //'Conclusion',
+    {trAdditionalFile} strToDo, //'additional file',
     {trEnclosingClass} strToDo, //'Enclosing Class',
     {trHeadlineCio} 'Všetky triedy, interfejsy a objekty',
     {trHeadlineConstants} 'Všetky konštanty',
@@ -98,7 +99,7 @@ RTransTable = (
     {trOnDateTime} strToDo, //'on',
     {trSearch} strToDo, //'Search',
     {trSeeAlso} strToDo, //'See also',
-    {trInternal} strToDo, //'internal',
+    {trNested} strToDo, //'nested',
     {trAttributes} strToDo, //'Attributes',
     ''  //dummy
   );

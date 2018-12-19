@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -96,8 +96,10 @@ type
     FSortSettings: TSortSettings;
     FConclusionFileName: string;
     FIntroductionFileName: string;
+    FAdditionalFilesNames: TStringList;
     FConclusion: TExternalItem;
     FIntroduction: TExternalItem;
+    FAdditionalFiles: TExternalItemList;
     FImplicitVisibility: TImplicitVisibility;
     FHandleMacros: boolean;
     FAutoLink: boolean;
@@ -165,6 +167,8 @@ type
     property Conclusion: TExternalItem read FConclusion;
     // After @link(Execute) has been called, @name holds the introduction.
     property Introduction: TExternalItem read FIntroduction;
+    // After @link(Execute) has been called, @name holds the additional external files.
+    property AdditionalFiles: TExternalItemList read FAdditionalFiles;
   published
     property DescriptionFileNames: TStringVector
       read FDescriptionFileNames write SetDescriptionFileNames;
@@ -206,6 +210,8 @@ type
     property ConclusionFileName: string read FConclusionFileName
       write FConclusionFileName;
 
+    property AdditionalFilesNames: TStringList read FAdditionalFilesNames;
+
     { See command-line option @--implicit-visibility documentation at
       [https://github.com/pasdoc/pasdoc/wiki/ImplicitVisibilityOption].
       This will be passed to parser instance. }
@@ -237,6 +243,7 @@ begin
   FDirectives := NewStringVector;
   FIncludeDirectories := NewStringVector;
   FSourceFileNames := NewStringVector;
+  FAdditionalFilesNames := TStringList.Create();
 
   { Set default property values }
   FGeneratorInfo := true;
@@ -258,9 +265,11 @@ begin
   FDirectives.Free;
   FIncludeDirectories.Free;
   FSourceFileNames.Free;
+  FAdditionalFilesNames.Free;
   FUnits.Free;
   FConclusion.Free;
   FIntroduction.Free;
+  FAdditionalFiles.Free;
   inherited;
 end;
 
@@ -434,6 +443,7 @@ var
   Count, i: Integer;
   p: string;
   InputStream: TStream;
+  additionalFile: TExternalItem;
 
   procedure ParseExternalFile(const FileName: string;
     var ExternalItem: TExternalItem);
@@ -486,6 +496,13 @@ begin
   ParseExternalFile(IntroductionFileName, FIntroduction);
   FreeAndNil(FConclusion);
   ParseExternalFile(ConclusionFileName, FConclusion);
+  FreeAndNil(FAdditionalFiles);
+  FAdditionalFiles := TExternalItemList.Create(true);
+  for i := 0 to FAdditionalFilesNames.Count - 1 do
+  begin
+    ParseExternalFile(AdditionalFilesNames[i], additionalFile);
+    FAdditionalFiles.Add(additionalFile)
+  end;
 
   DoMessage(2, pmtInformation, '... %d Source File(s) parsed', [Count]);
 end;
@@ -599,6 +616,7 @@ begin
   Generator.Units := FUnits;
   Generator.Introduction := FIntroduction;
   Generator.Conclusion := FConclusion;
+  Generator.AdditionalFiles := FAdditionalFiles;
   Generator.AutoLink := AutoLink;
   Generator.BuildLinks;
 
@@ -765,7 +783,7 @@ begin
       my_introduction.html -- without this check, pasdoc could
       overwrite this file too easily). }
     if SameText(ExtractFileExt(FileName), Generator.GetFileExtension) then
-      raise Exception.CreateFmt('Introduction/conclusion file extension' +
+      raise Exception.CreateFmt('External file extension' +
         ' is the same as file extension of generated documentation ("%s"), ' +
         'refusing to generate documentation', [Generator.GetFileExtension]);
 

@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -246,6 +246,7 @@ type
     FLinkLook: TLinkLook;
     FConclusion: TExternalItem;
     FIntroduction: TExternalItem;
+    FAdditionalFiles: TExternalItemList;
 
     FAbbreviations: TStringList;
     FGraphVizClasses: boolean;
@@ -776,6 +777,10 @@ type
      See @link(WriteExternal).}
     procedure WriteIntroduction;
 
+    {@name writes the other files for the project.
+     See @link(WriteExternal).}
+    procedure WriteAdditionalFiles;
+
     // @name writes a section heading and a link-anchor;
     function FormatSection(HL: integer; const Anchor: string;
       const Caption: string): string; virtual; abstract;
@@ -806,19 +811,18 @@ type
       ConvertString(Text). }
     function FormatPreformatted(const Text: string): string; virtual;
 
-    { This should return markup upon including specified image in description.
-      FileNames is a list of alternative filenames of an image,
-      it always contains at least one item (i.e. FileNames.Count >= 1),
+    { Return markup to show an image.
+      FileNames is a list of possible filenames of the image.
+      FileNames always contains at least one item (i.e. FileNames.Count >= 1),
       never contains empty lines (i.e. Trim(FileNames[I]) <> ''),
-      and contains only absolute filenames (already expanded to take description's
-      unit's path into account).
+      and contains only absolute filenames.
 
       E.g. HTML generator will want to choose the best format for HTML,
       then somehow copy the image from FileNames[Chosen] and wrap
       this in <img src="...">.
 
-      Implementation of this method in this class simply returns
-      @code(Result := ExpandFileName(FileNames[0])). Output generators should override this. }
+      Implementation of this method in this class simply shows
+      @code(FileNames[0]). Output generators should override this. }
     function FormatImage(FileNames: TStringList): string; virtual;
 
     { Format a list from given ListData. }
@@ -880,6 +884,7 @@ type
     property Introduction: TExternalItem read FIntroduction
       write FIntroduction;
     property Conclusion: TExternalItem read FConclusion write FConclusion;
+    property AdditionalFiles: TExternalItemList read FAdditionalFiles write FAdditionalFiles;
 
     { Callback receiving messages from generator.
 
@@ -1122,6 +1127,15 @@ begin
   begin
     Conclusion.FullLink := CreateLink(Conclusion);
     Conclusion.OutputFileName := Conclusion.FullLink;
+  end;
+
+  if (AdditionalFiles <> nil) and (AdditionalFiles.Count > 0) then
+  begin
+    for i := 0 to AdditionalFiles.Count - 1 do
+    begin
+      AdditionalFiles.Get(i).FullLink := CreateLink(AdditionalFiles.Get(i));
+      AdditionalFiles.Get(i).OutputFileName := AdditionalFiles.Get(i).FullLink;
+    end;
   end;
 
   for i := 0 to Units.Count - 1 do begin
@@ -2078,6 +2092,13 @@ procedure TDocGenerator.ExpandDescriptions;
     begin
       ExpandExternalItem(PreExpand, Conclusion);
     end;
+    if (AdditionalFiles <> nil) and (AdditionalFiles.Count > 0) then
+    begin
+      for i := 0 to AdditionalFiles.Count - 1 do
+      begin
+        ExpandExternalItem(PreExpand, AdditionalFiles.Get(i));
+      end;
+    end;
 
     for i := 0 to Units.Count - 1 do begin
       U := Units.UnitAt[i];
@@ -2207,6 +2228,20 @@ begin
           end;
           Result := Conclusion.FindItem(NameParts[0]);
           if Result <> nil then Exit;
+        end;
+
+        if (AdditionalFiles <> nil) and (AdditionalFiles.Count > 0) then
+        begin
+          for i := 0 to AdditionalFiles.Count - 1 do
+          begin
+            if  SameText(AdditionalFiles.Get(i).Name, NameParts[0]) then
+            begin
+              Result := AdditionalFiles.Get(i);
+              Exit;
+            end;
+            Result := AdditionalFiles.Get(i).FindItem(NameParts[0]);
+            if Result <> nil then Exit;
+          end;
         end;
 
         for i := 0 to Units.Count - 1 do
@@ -2903,6 +2938,7 @@ end;
 procedure TDocGenerator.StartSpellChecking(const AMode: string);
 var
   WordsToIgnore: TStringList;
+  i: Integer;
 
   procedure AddSubItems(Items: TBaseItems);
   var
@@ -2990,6 +3026,14 @@ begin
       begin
         WordsToIgnore.Add(Conclusion.Name);
         AddSubItems(Conclusion.Anchors);
+      end;
+      if (AdditionalFiles <> nil) and (AdditionalFiles.Count > 0) then
+      begin
+        for i := 0 to AdditionalFiles.Count - 1 do
+        begin
+          WordsToIgnore.Add(AdditionalFiles.Get(i).Name);
+          AddSubItems(AdditionalFiles.Get(i).Anchors);
+        end;
       end;
       AddSubItems(Units);
       FAspellProcess.SetIgnoreWords(WordsToIgnore);
@@ -3683,6 +3727,16 @@ begin
   WriteExternal(Conclusion, trConclusion);
 end;
 
+procedure TDocGenerator.WriteAdditionalFiles;
+var
+  i: Integer;
+begin
+  for i := 0 to AdditionalFiles.Count - 1 do
+  begin
+    WriteExternal(AdditionalFiles.Get(i), trAdditionalFile);
+  end;
+end;
+
 procedure TDocGenerator.PreHandleAnchorTag(
   ThisTag: TTag; var ThisTagData: TObject;
   EnclosingTag: TTag; var EnclosingTagData: TObject;
@@ -3882,7 +3936,11 @@ end;
 
 function TDocGenerator.FormatImage(FileNames: TStringList): string;
 begin
-  Result := ExpandFileName(FileNames[0]);
+  // Result := FileNames[0];
+  { Show relative path, since absolute path is
+    - unportable (doesn't make sense on other systems than current)
+    - makes our tests output not reproducible. }
+  Result := ExtractRelativePath(FCurrentItem.BasePath, FileNames[0]);
 end;
 
 procedure TDocGenerator.HandleIncludeTag(

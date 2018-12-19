@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -53,7 +53,7 @@ type
   EPasDoc = class(Exception)
   public
     constructor Create(const AMessage: string;
-      const AArguments: array of const; const AExitCode: Word);
+      const AArguments: array of const; const AExitCode: Word = 3);
   end;
 
   { This represents parts of a qualified name of some item.

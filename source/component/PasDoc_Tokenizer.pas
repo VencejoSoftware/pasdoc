@@ -1,5 +1,5 @@
 {
-  Copyright 1998-2016 PasDoc developers.
+  Copyright 1998-2018 PasDoc developers.
 
   This file is part of "PasDoc".
 
@@ -306,6 +306,7 @@ type
   TTokenizer = class(TObject)
   private
     FBufferedCharSize : Integer;
+    FBufferedToken: TToken;
     function StreamPosition: Int64;
   protected
     FOnMessage: TPasDocMessageEvent;
@@ -326,8 +327,7 @@ type
     FStreamName: string;
     FStreamPath: string;
 
-    procedure DoError(const AMessage: string; const AArguments: array of
-      const; const AExitCode: Word);
+    procedure DoError(const AMessage: string; const AArguments: array of const);
     procedure DoMessage(const AVerbosity: Cardinal; const MessageType:
       TPasDocMessageType; const AMessage: string; const AArguments: array of const);
 
@@ -369,8 +369,17 @@ type
     destructor Destroy; override;
     function HasData: Boolean;
     function GetStreamInfo: string;
-    function GetToken: TToken;
-    { Skips all chars until it encounters either $ELSE or $ENDIF compiler defines. }
+    function GetToken(const NilOnEnd: Boolean = false): TToken;
+
+    { Makes the token T next to be returned by GetToken.
+      Also sets T to @nil, to prevent you from freeing it accidentally.
+
+      You cannot have more than one "unget" token.
+      If you only call UnGetToken after some GetToken, you are safe. }
+    procedure UnGetToken(var T: TToken);
+
+    { Skip all chars until it encounters some compiler directive,
+      like $ELSE or $ENDIF. }
     function SkipUntilCompilerDirective: TToken;
 
     property OnMessage: TPasDocMessageEvent read FOnMessage write FOnMessage;
@@ -558,6 +567,7 @@ end;
 destructor TTokenizer.Destroy;
 begin
   Stream.Free;
+  FBufferedToken.Free;
   inherited;
 end;
 
@@ -594,11 +604,11 @@ end;
 
 { ---------------------------------------------------------------------------- }
 
-procedure TTokenizer.DoError(const AMessage: string; const AArguments: array
-  of const; const AExitCode: Word);
+procedure TTokenizer.DoError(const AMessage: string;
+  const AArguments: array of const);
 begin
   raise EPasDoc.Create(AMessage + Format(' (at %s)', [GetStreamInfo]),
-    AArguments, AExitCode);
+    AArguments, 2);
 end;
 
 { ---------------------------------------------------------------------------- }
@@ -723,7 +733,7 @@ end;
 
 { ---------------------------------------------------------------------------- }
 
-function TTokenizer.GetToken: TToken;
+function TTokenizer.GetToken(const NilOnEnd: Boolean = false): TToken;
 var
   c: Char;
   MaybeKeyword: TKeyword;
@@ -731,11 +741,22 @@ var
   J: Integer;
   BeginPosition: integer;
 begin
+  if Assigned(FBufferedToken) then
+  begin
+    { we have a token buffered, we'll return this one }
+    Result := FBufferedToken;
+    FBufferedToken := nil;
+    Exit;
+  end;
+
   Result := nil;
   BeginPosition := StreamPosition; //used in finally
   try
     if GetChar(c) = 0 then
-      DoError('Tokenizer: could not read character', [], 0);
+      if NilOnEnd then
+        Exit(nil)
+      else
+        DoError('Tokenizer: could not read character', []);
 
     if IsCharInSet(c, Whitespace) then
     begin
@@ -745,7 +766,7 @@ begin
             TODO: will fail on Mac files (row is 13) }
         Inc(Row, StrCountCharA(Result.Data, #10))
       else
-        DoError('Tokenizer: could not read character', [], 0);
+        DoError('Tokenizer: could not read character', []);
     end else
     if IsCharInSet(c, IdentifierStart) then
     begin
@@ -792,7 +813,7 @@ begin
         '(': begin
             c := ' ';
             if HasData and not PeekChar(c) then
-              DoError('Tokenizer: could not read character', [], 0);
+              DoError('Tokenizer: could not read character', []);
             case c of
               '*': begin
                   ConsumeChar;
@@ -889,6 +910,12 @@ begin
           end;
         '\': Result := CreateSymbolToken(SYM_BACKSLASH);
         '%': Result := ReadAttAssemblerRegister;
+        '&': begin
+               if not ((GetChar(C) > 0) and
+                       IsCharInSet(C, IdentifierStart) and
+                       ReadToken(C, IdentifierOther, TOK_IDENTIFIER, Result)) then
+                 DoError('Cannot read valid identifier after "&" prefix', []);
+             end;
       else begin
           for J := 0 to NUM_SINGLE_CHAR_SYMBOLS - 1 do begin
             if (c = SingleCharSymbols[J].c) then begin
@@ -896,7 +923,7 @@ begin
               exit;
             end;
           end;
-          DoError('Invalid character (code %d) in Pascal input stream', [Ord(C)], 0);
+          DoError('Invalid character ("%s", code %d) in Pascal input stream', [C, Ord(C)]);
         end;
       end;
   finally
@@ -1059,16 +1086,16 @@ begin
   repeat
     if not (Stream.Position < Stream.Size) then begin
       ReleaseToken;
-      DoError('Tokenizer: unexpected end of stream', [], 0);
+      DoError('Tokenizer: unexpected end of stream', []);
     end;
     if GetChar(c) = 0 then begin
       ReleaseToken;
-      DoError('Tokenizer: could not read character', [], 0);
+      DoError('Tokenizer: could not read character', []);
     end;
     if c = QuoteChar then begin
       if not PeekChar(c) then begin
         ReleaseToken;
-        DoError('Tokenizer: could not peek character', [], 0)
+        DoError('Tokenizer: could not peek character', [])
       end;
       if c = QuoteChar then { escaped single quote within string } begin
         ConsumeChar;
@@ -1164,8 +1191,18 @@ begin
         #10: Inc(Row);
       end
     else
-      DoError('Could not read character', [], 0);
+      DoError('Unexpected end of stream (while skipping to the next compiler directive)', []);
   until False;
+end;
+
+procedure TTokenizer.UnGetToken(var t: TToken);
+begin
+  if Assigned(FBufferedToken) then
+    DoError('%s: Cannot UnGet more than one token in TTokenizer',
+      [GetStreamInfo]);
+
+  FBufferedToken := t;
+  t := nil;
 end;
 
 end.
