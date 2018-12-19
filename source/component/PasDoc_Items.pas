@@ -1271,6 +1271,29 @@ begin
   ReplaceStr := '';
 end;
 
+{$IFNDEF FPC}
+procedure RemoveTrailingChars(var S: AnsiString; const CSet: TSysCharset);
+var
+  i, J: LONGINT;
+begin
+  i := Length(S);
+  if (i > 0) then
+  begin
+    J := i;
+    while (J > 0) and (S[J] in CSet) do
+      Dec(J);
+    if J <> i then
+      SetLength(S, J);
+  end;
+end;
+
+function TrimRightSet(const S: String; const CSet: TSysCharset): AnsiString;
+begin
+  Result := S;
+  RemoveTrailingChars(Result, CSet);
+end;
+{$ENDIF}
+
 procedure TBaseItem.StoreCVSTag(
   ThisTag: TTag; var ThisTagData: TObject;
   EnclosingTag: TTag; var EnclosingTagData: TObject;
